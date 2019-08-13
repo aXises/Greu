@@ -61,6 +61,32 @@ split(char *string, char *delim, int *size)
 		return split_string;
 }
 
+struct device *
+setup_device(char *dev_str, enum device_type type)
+{
+		struct device_config config;
+		config.type = type;
+		config.dev_path = NULL;
+		config.key = NULL;
+
+		int arr_size;
+		char **split_string = split(dev_str, "@", &arr_size);
+
+		config.dev_path = malloc(sizeof(split_string[0]));
+		strcpy(config.dev_path, split_string[0]);
+
+		if (arr_size == 2) {
+			char *key = split_string[1];
+			config.key = malloc(strlen(key));
+			strcpy(config.key, key);
+		}
+
+		free(split_string);
+		struct device *dev = malloc(sizeof(struct device));
+		dev->config = config;
+		return dev;
+}
+
 struct prog_options
 parse_args(int argc, char *argv[])
 {
