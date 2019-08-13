@@ -290,7 +290,37 @@ connect_to_remote(char *remote_name, char *remote_port)
 int
 main(int argc, char *argv[])
 {
-		struct prog_options options = parse_args(argc, argv);
-		printf("address: %s, source_port %s, server: %s, destination_port: %s\n", options.local_address, options.source_port, options.server, options.destin_port);
+		struct device *dev;
+		struct device_list devices = TAILQ_HEAD_INITIALIZER(devices);
+
+		struct prog_options options = parse_args(&devices, argc, argv);
+		printf("local_address: %s, source_port %s, server: %s, destination_port: %s\n", options.local_address, options.source_port, options.server, options.destin_port);
+
+		int local_fd = create_local_server(options.local_address,
+				options.source_port);
+		int remote_fd =	connect_to_remote(options.server, options.destin_port);
+		
+		printf("local server: %i, remote: %i\n", local_fd, remote_fd);
+
+		event_init();
+
+		struct event *socket_conn_event = malloc(sizeof(struct event));
+		event_set(socket_conn_event, local_fd, EV_READ|EV_PERSIST,
+			socket_msg_received, socket_conn_event);
+		event_add(socket_conn_event, NULL);
+
+		TAILQ_FOREACH(dev, &devices, entry) {
+			dev->socket_fd = remote_fd;
+			int device_fd = make_device_fd(dev);
+			printf("created device - fd: %i\n", device_fd);
+			event_set(&dev->ev, device_fd, EV_READ|EV_PERSIST,
+				device_ready, dev);
+			event_add(&dev->ev, NULL);
+		}
+
+		event_dispatch();
+
+		
+		free_devices(dev, devices);
 		return EXIT_NORMAL;
 }
