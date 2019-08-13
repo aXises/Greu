@@ -37,6 +37,30 @@ usage(void)
 		exit(EXIT_ERROR);
 }
 
+/**
+* Split an string in to an array of strings by an character.
+* @param string - The string to split.
+* @param delim - The character to split by.
+* @return char - An array of split strings.
+*/
+char **
+split(char *string, char *delim, int *size)
+{
+		char *segment = NULL;
+		char **split_string = malloc(sizeof(char *));
+		int counter = 0;
+		while ((segment = strsep(&string, delim)) != NULL) {
+			if (strlen(segment) != 0) {
+				split_string = realloc(split_string,
+					sizeof(char *) * (counter + 1));
+				split_string[counter] = segment;
+				counter++;
+			}
+		}
+		*size = counter;
+		return split_string;
+}
+
 struct prog_options
 parse_args(int argc, char *argv[])
 {
