@@ -88,7 +88,7 @@ setup_device(char *dev_str, enum device_type type)
 }
 
 struct prog_options
-parse_args(int argc, char *argv[])
+parse_args(struct device_list *devices, int argc, char *argv[])
 {
 		struct prog_options options;
 		options.af = AF_UNSPEC;
@@ -113,10 +113,16 @@ parse_args(int argc, char *argv[])
 			case 'p':
 				options.source_port = optarg;
 				break;
-			case 'e':
+			case 'e': {
+				struct device *dev = setup_device(optarg, TYPE_TAP);
+				TAILQ_INSERT_TAIL(devices, dev, entry);
 				break;
-			case 'i':
+			}
+			case 'i': {
+				struct device *dev = setup_device(optarg, TYPE_TUN);
+				TAILQ_INSERT_TAIL(devices, dev, entry);
 				break;
+			}
 			default:
 				usage();
 				/* NOTREACHED */
