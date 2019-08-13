@@ -165,6 +165,85 @@ make_device_fd(struct device *dev)
 }
 
 int
+create_local_server(char *hostname, char *port)
+{
+		struct addrinfo hints, *res, *res0;
+		int error;
+		const char *cause;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_DGRAM;
+
+		error = getaddrinfo(hostname, port, &hints, &res0);
+		if (error != 0) {
+			errx(1, "host %s port %s: %s", hostname, port,
+				gai_strerror(error));
+		}
+
+		int sock_fd;
+		for (res = res0; res != NULL; res = res->ai_next) {
+			sock_fd = socket(res->ai_family, res->ai_socktype | SOCK_NONBLOCK,
+				res->ai_protocol);
+			if (sock_fd == -1) {
+				cause = strerror(errno);
+				continue;
+			}
+
+			if (bind(sock_fd, res->ai_addr, res->ai_addrlen) == -1) {
+				cause = strerror(errno);
+				close(sock_fd);
+				continue;
+			}
+			break;
+		}
+		if (sock_fd < 0) {
+			err(1, "%s", cause);
+		}
+		freeaddrinfo(res0);
+		return sock_fd;
+}
+
+int
+connect_to_remote(char *remote_name, char *remote_port)
+{
+		struct addrinfo hints, *res, *res0;
+		int error;
+		const char *cause;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_DGRAM;
+		error = getaddrinfo(remote_name, remote_port, &hints, &res0);
+		if (error != 0) {
+			errx(1, "host %s port %s: %s", remote_name, remote_port,
+				gai_strerror(error));
+		}
+
+		int server_fd;
+		for (res = res0; res != NULL; res = res->ai_next) {
+			server_fd = socket(res->ai_family, res->ai_socktype | SOCK_NONBLOCK,
+				res->ai_protocol);
+			if (server_fd == -1) {
+				cause = strerror(errno);
+				continue;
+			}
+
+			if (connect(server_fd, res->ai_addr, res->ai_addrlen) < 0) {
+				cause = strerror(errno);
+				close(server_fd);
+				continue;
+			}
+			break;
+		}
+		if (server_fd < 0) {
+			err(1, "%s", cause);
+		}
+		freeaddrinfo(res0);
+		return server_fd;
+}
+
+int
 main(int argc, char *argv[])
 {
 		struct prog_options options = parse_args(argc, argv);
