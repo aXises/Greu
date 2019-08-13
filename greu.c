@@ -145,6 +145,26 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 }
 
 int
+make_device_fd(struct device *dev)
+{
+		// printf("path: %s, key: %s, type: %i\n", dev->config.dev_path, dev->config.key, dev->config.type);
+		int fd = open(dev->config.dev_path, O_RDWR);
+		if (fd < 0) {
+			printf("Error opening %s\n", dev->config.dev_path);
+			return fd;
+		}
+
+		int flags = 1;
+		int error = ioctl(fd, FIONBIO, &flags);
+		if (error) {
+			printf("ioctl error: %i\n", error);
+			return error;
+		}
+
+		return fd;
+}
+
+int
 main(int argc, char *argv[])
 {
 		struct prog_options options = parse_args(argc, argv);
