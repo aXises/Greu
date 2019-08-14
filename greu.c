@@ -321,6 +321,15 @@ connect_to_remote(char *remote_name, char *remote_port)
 }
 
 /*
+* Data received from remote fd, decapsulate it and write to our interface.
+*/
+void
+socket_msg_received(int fd, short event, void *conn)
+{
+	// printf("socket message event\n");
+}
+
+/*
 * Device ready, read the packets from interface. Encapsulate it and write it
 * to our remote fd.
 */
