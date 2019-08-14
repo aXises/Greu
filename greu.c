@@ -6,6 +6,12 @@
 #include <netdb.h>
 #include <errno.h>
 #include <err.h>
+#include <fcntl.h>
+
+#include <stdio.h>
+#include <inttypes.h>
+#include <errno.h>
+#include <string.h>
 
 #include <event.h>
 
@@ -19,38 +25,29 @@
 #include <net/if_tun.h>
 #include <net/if_types.h>
 
-struct gre_header {
-        uint16_t                gre_flags;
-#define GRE_CP                          0x8000  /* Checksum Present */
-#define GRE_KP                          0x2000  /* Key Present */
-#define GRE_SP                          0x1000  /* Sequence Present */
+#define PACKET_ETHERNET htons(0x6558)
+#define PACKET_IPV4 htons(0x0800)
+#define PACKET_IPV6 htons(0x86DD)
+#define GRE_KP 0x2000  /* Key Present */
 
-#define GRE_VERS_MASK                   0x0007
-#define GRE_VERS_0                      0x0000
-#define GRE_VERS_1                      0x0001
+#define BUFFER_SIZE 1023
 
-        uint16_t                gre_proto;
+struct gre_header
+{
+	uint16_t gre_flags;
+	uint16_t gre_proto;
 } __packed __aligned(4);
 
 enum exit_status {EXIT_NORMAL, EXIT_ERROR};
 
-enum device_type {TYPE_TAP, TYPE_TUN};
+enum device_type{TYPE_TAP, TYPE_TUN};
 
 struct device_config
 {
+	enum device_type type;
 	char *dev_path;
 	char *key;
-	enum device_type type;
 };
-
-struct device {
-	TAILQ_ENTRY(device)
-			entry;
-	int socket_fd;
-	struct device_config config;
-	struct event ev;
-};
-TAILQ_HEAD(device_list, device);
 
 struct prog_options
 {
@@ -61,6 +58,17 @@ struct prog_options
 	char *server;
 	char *destin_port;
 };
+
+struct device
+{
+	TAILQ_ENTRY(device)
+	entry;
+	struct prog_options options;
+	struct device_config config;
+	struct event ev;
+	int socket_fd;
+};
+TAILQ_HEAD(device_list, device);
 
 __dead static void
 usage(void)
