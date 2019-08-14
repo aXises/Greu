@@ -320,6 +320,76 @@ connect_to_remote(char *remote_name, char *remote_port)
 		return server_fd;
 }
 
+struct addrinfo *
+generate_addrinfo(const char *name, const char *port, sa_family_t af)
+{
+    struct addrinfo hints;
+    struct addrinfo *res;
+    int error;
+    
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = af;
+    hints.ai_socktype = SOCK_DGRAM;
+    
+    error = getaddrinfo(name, port, &hints, &res);
+    
+    if (error) {
+        errx(1, "%s", gai_strerror(error));
+    }
+    
+    return res;
+}
+
+int
+create_socket_fd(sa_family_t af, char *hostname, char *port,
+	char *remote_name, char *remote_port)
+{
+		struct addrinfo *src_addrinfo, *remote_addrinfo, *res;
+		int sock_fd;
+		const char *cause;
+
+		src_addrinfo = generate_addrinfo(hostname, port, af);
+
+		for (res = src_addrinfo; res != NULL; res = res->ai_next)
+		{
+			sock_fd = socket(res->ai_family, res->ai_socktype | SOCK_NONBLOCK,
+							res->ai_protocol);
+			if (sock_fd == -1)
+			{
+				cause = strerror(errno);
+				continue;
+			}
+
+			if (bind(sock_fd, res->ai_addr, res->ai_addrlen) == -1)
+			{
+				cause = strerror(errno);
+				close(sock_fd);
+				continue;
+			}
+			break;
+		}
+
+		remote_addrinfo = generate_addrinfo(remote_name, remote_port, af);
+		for (res = remote_addrinfo; res != NULL; res = res->ai_next)
+		{
+			if (connect(sock_fd, res->ai_addr, res->ai_addrlen) < 0)
+			{
+				cause = strerror(errno);
+				close(sock_fd);
+				continue;
+			}
+			break;
+		}
+		if (sock_fd < 0)
+		{
+			err(1, "%s", cause);
+		}
+
+		freeaddrinfo(src_addrinfo);
+		freeaddrinfo(remote_addrinfo);
+		return sock_fd;
+}
+
 /*
 * Data received from remote fd, decapsulate it and write to our interface.
 */
