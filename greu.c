@@ -76,7 +76,8 @@ usage(void)
 		extern char *__progname;
 		fprintf(stderr, "usage: %s [-46d] [-l address] [-p port]\n"
 						"[-e /dev/tapX[@key]] [-i /dev/tunX[@key]]\n"
-						"server [port]\n", __progname);
+						"server [port]\n",
+				__progname);
 		exit(EXIT_ERROR);
 }
 
@@ -92,10 +93,12 @@ split(char *string, char *delim, int *size)
 		char *segment = NULL;
 		char **split_string = malloc(sizeof(char *));
 		int counter = 0;
-		while ((segment = strsep(&string, delim)) != NULL) {
-			if (strlen(segment) != 0) {
+		while ((segment = strsep(&string, delim)) != NULL)
+		{
+			if (strlen(segment) != 0)
+			{
 				split_string = realloc(split_string,
-					sizeof(char *) * (counter + 1));
+									sizeof(char *) * (counter + 1));
 				split_string[counter] = segment;
 				counter++;
 			}
@@ -118,7 +121,8 @@ setup_device(char *dev_str, enum device_type type)
 		config.dev_path = malloc(sizeof(split_string[0]));
 		strcpy(config.dev_path, split_string[0]);
 
-		if (arr_size == 2) {
+		if (arr_size == 2)
+		{
 			char *key = split_string[1];
 			config.key = malloc(strlen(key));
 			strcpy(config.key, key);
@@ -139,8 +143,10 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 		options.local_address = NULL;
 		options.source_port = NULL;
 		int c;
-		while ((c = getopt(argc, argv, "46dl:p:e:i:")) != -1) {
-			switch (c) {
+		while ((c = getopt(argc, argv, "46dl:p:e:i:")) != -1)
+		{
+			switch (c)
+			{
 			case '4':
 				options.af = AF_INET;
 				break;
@@ -156,12 +162,14 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 			case 'p':
 				options.source_port = optarg;
 				break;
-			case 'e': {
+			case 'e':
+			{
 				struct device *dev = setup_device(optarg, TYPE_TAP);
 				TAILQ_INSERT_TAIL(devices, dev, entry);
 				break;
 			}
-			case 'i': {
+			case 'i':
+			{
 				struct device *dev = setup_device(optarg, TYPE_TUN);
 				TAILQ_INSERT_TAIL(devices, dev, entry);
 				break;
@@ -171,17 +179,22 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 				/* NOTREACHED */
 			}
 		}
-		if (optind > argc || argc - optind > 2 || argc - optind == 0) {
+		if (optind > argc || argc - optind > 2 || argc - optind == 0)
+		{
 			usage();
 		}
-		if (argc - optind == 1) {
+		if (argc - optind == 1)
+		{
 			options.server = argv[argc - 1];
 			options.destin_port = "4754";
-		} else if (argc - optind == 2) {
+		}
+		else if (argc - optind == 2)
+		{
 			options.server = argv[argc - 2];
 			options.destin_port = argv[argc - 1];
 		}
-		if (options.source_port == NULL) {
+		if (options.source_port == NULL)
+		{
 			options.source_port = options.destin_port;
 		}
 		return options;
@@ -190,7 +203,8 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 void
 free_devices(struct device *dev, struct device_list devices)
 {
-		TAILQ_FOREACH(dev, &devices, entry) {
+		TAILQ_FOREACH(dev, &devices, entry)
+		{
 			free(dev->config.dev_path);
 			free(dev->config.key);
 		}
@@ -199,16 +213,17 @@ free_devices(struct device *dev, struct device_list devices)
 int
 make_device_fd(struct device *dev)
 {
-		// printf("path: %s, key: %s, type: %i\n", dev->config.dev_path, dev->config.key, dev->config.type);
 		int fd = open(dev->config.dev_path, O_RDWR);
-		if (fd < 0) {
+		if (fd < 0)
+		{
 			printf("Error opening %s\n", dev->config.dev_path);
 			return fd;
 		}
 
 		int flags = 1;
 		int error = ioctl(fd, FIONBIO, &flags);
-		if (error) {
+		if (error)
+		{
 			printf("ioctl error: %i\n", error);
 			return error;
 		}
@@ -228,28 +243,33 @@ create_local_server(char *hostname, char *port)
 		hints.ai_socktype = SOCK_DGRAM;
 
 		error = getaddrinfo(hostname, port, &hints, &res0);
-		if (error != 0) {
+		if (error != 0)
+		{
 			errx(1, "host %s port %s: %s", hostname, port,
 				gai_strerror(error));
 		}
 
 		int sock_fd;
-		for (res = res0; res != NULL; res = res->ai_next) {
+		for (res = res0; res != NULL; res = res->ai_next)
+		{
 			sock_fd = socket(res->ai_family, res->ai_socktype | SOCK_NONBLOCK,
-				res->ai_protocol);
-			if (sock_fd == -1) {
+							res->ai_protocol);
+			if (sock_fd == -1)
+			{
 				cause = strerror(errno);
 				continue;
 			}
 
-			if (bind(sock_fd, res->ai_addr, res->ai_addrlen) == -1) {
+			if (bind(sock_fd, res->ai_addr, res->ai_addrlen) == -1)
+			{
 				cause = strerror(errno);
 				close(sock_fd);
 				continue;
 			}
 			break;
 		}
-		if (sock_fd < 0) {
+		if (sock_fd < 0)
+		{
 			err(1, "%s", cause);
 		}
 		freeaddrinfo(res0);
@@ -267,28 +287,33 @@ connect_to_remote(char *remote_name, char *remote_port)
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_DGRAM;
 		error = getaddrinfo(remote_name, remote_port, &hints, &res0);
-		if (error != 0) {
+		if (error != 0)
+		{
 			errx(1, "host %s port %s: %s", remote_name, remote_port,
 				gai_strerror(error));
 		}
 
 		int server_fd;
-		for (res = res0; res != NULL; res = res->ai_next) {
+		for (res = res0; res != NULL; res = res->ai_next)
+		{
 			server_fd = socket(res->ai_family, res->ai_socktype | SOCK_NONBLOCK,
-				res->ai_protocol);
-			if (server_fd == -1) {
+							res->ai_protocol);
+			if (server_fd == -1)
+			{
 				cause = strerror(errno);
 				continue;
 			}
 
-			if (connect(server_fd, res->ai_addr, res->ai_addrlen) < 0) {
+			if (connect(server_fd, res->ai_addr, res->ai_addrlen) < 0)
+			{
 				cause = strerror(errno);
 				close(server_fd);
 				continue;
 			}
 			break;
 		}
-		if (server_fd < 0) {
+		if (server_fd < 0)
+		{
 			err(1, "%s", cause);
 		}
 		freeaddrinfo(res0);
@@ -298,37 +323,40 @@ connect_to_remote(char *remote_name, char *remote_port)
 int
 main(int argc, char *argv[])
 {
-		struct device *dev;
 		struct device_list devices = TAILQ_HEAD_INITIALIZER(devices);
+		struct prog_options options;
+		struct device *dev;
+		struct event *socket_conn_event;
+		int sock_fd;
 
-		struct prog_options options = parse_args(&devices, argc, argv);
-		printf("local_address: %s, source_port %s, server: %s, destination_port: %s\n", options.local_address, options.source_port, options.server, options.destin_port);
+		options = parse_args(&devices, argc, argv);
+		printf("greu - local_address: %s, source_port %s, server: %s, destination_port: %s\n", options.local_address, options.source_port, options.server, options.destin_port);
 
-		int local_fd = create_local_server(options.local_address,
-				options.source_port);
-		int remote_fd =	connect_to_remote(options.server, options.destin_port);
-		
-		printf("local server: %i, remote: %i\n", local_fd, remote_fd);
+		sock_fd = create_socket_fd(options.af, options.local_address, options.source_port,
+			options.server, options.destin_port);
+
+		printf("Socket fd: %i\n", sock_fd);
 
 		event_init();
 
-		struct event *socket_conn_event = malloc(sizeof(struct event));
-		event_set(socket_conn_event, local_fd, EV_READ|EV_PERSIST,
-			socket_msg_received, socket_conn_event);
+		socket_conn_event = malloc(sizeof(struct event));
+		event_set(socket_conn_event, sock_fd, EV_READ | EV_PERSIST,
+				socket_msg_received, socket_conn_event);
 		event_add(socket_conn_event, NULL);
 
-		TAILQ_FOREACH(dev, &devices, entry) {
-			dev->socket_fd = remote_fd;
+		TAILQ_FOREACH(dev, &devices, entry)
+		{
+			dev->options = options;
+			dev->socket_fd = sock_fd;
 			int device_fd = make_device_fd(dev);
-			printf("created device - fd: %i\n", device_fd);
-			event_set(&dev->ev, device_fd, EV_READ|EV_PERSIST,
-				device_ready, dev);
+			printf("Interface %s created on fd: %i\n", dev->config.dev_path, device_fd);
+			event_set(&dev->ev, device_fd, EV_READ | EV_PERSIST,
+					interface_msg_received, dev);
 			event_add(&dev->ev, NULL);
 		}
 
 		event_dispatch();
 
-		
 		free_devices(dev, devices);
 		return EXIT_NORMAL;
 }
