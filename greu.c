@@ -396,7 +396,53 @@ create_socket_fd(sa_family_t af, char *hostname, char *port,
 void
 socket_msg_received(int fd, short event, void *conn)
 {
-	// printf("socket message event\n");
+	struct device_list *devices = (struct device_list *) conn;
+	struct device *dev = NULL;
+	struct gre_header header;
+	enum device_type packet_type;
+	uint32_t key = -1;
+	ssize_t read_size;
+	char packet[BUFFER_SIZE];
+
+	read_size = read(fd, packet, BUFFER_SIZE);
+
+	if (read_size < 0)
+	{
+		err(1, "Error reading from %s: %s\n", dev->config.dev_path,
+			strerror(errno));
+	}
+
+	// printf("-------------------- Socket Output:\n");
+	// for (int i = 0; i < read_size; i++)
+	// {
+	// 	printf("%x|", packet[i]);
+	// }
+	// printf("\n");
+
+	memcpy(&header, packet, sizeof(struct gre_header));
+
+	// printf("flags %x\n", ntohs(header.gre_flags));
+	// printf("proto %x\n", ntohs(header.gre_proto));
+
+	if (header.gre_flags == GRE_KP)
+	{
+		memcpy(&key, &packet[sizeof(struct gre_header)],
+			sizeof(uint32_t));
+	}
+	if (header.gre_proto == PACKET_ETHERNET)
+	{
+		packet_type = TYPE_TAP;
+	}
+	else
+	{
+		packet_type = TYPE_TUN;
+	}
+
+	TAILQ_FOREACH(dev, devices, entry)
+	{
+		write_to_interface(header, dev, packet_type, key, packet,
+			read_size);
+	}
 }
 
 void
@@ -506,28 +552,29 @@ interface_msg_received(int fd, short event, void *conn)
 		{
 			header.gre_proto = PACKET_IPV4;
 		}
-		else {
-			memcpy(&packet[sizeof(struct gre_header)], &data[read_offset], read_size - read_offset);
+		else if (ntohl(*tun_af) == AF_INET6)
+		{
+			header.gre_proto = PACKET_IPV6;
 		}
-
-		if (dev->config.key != NULL) {
-			printf("-------------------- GRE Packet with key\n");
-			for (int i = 0; i < sizeof(struct gre_header) + sizeof(uint32_t) + read_size; i++)
-			{
-				printf("%x|", packet[i]);
-			}
-			printf("\n");
-		} else {
-			printf("-------------------- GRE Packet no key\n");
-			for (int i = 0; i < sizeof(struct gre_header) + read_size; i++)
-			{
-				printf("%x|", packet[i]);
-			}
-			printf("\n");
+		else
+		{
+			err(1, "Unsupported socket.\n");
 		}
+		free(tun_af);
+	}
 
-		write(dev->socket_fd, packet, sizeof(struct gre_header) + read_size);
-		// free(data);
+	/*
+	* GRE key present.
+	*/
+	net_key = -1;
+	if (dev->config.key != NULL)
+	{
+		header.gre_flags = header.gre_flags | GRE_KP;
+		net_key = htonl(strtoul(dev->config.key, NULL, 10));
+	}
+
+	write_to_server_socket(header, dev->socket_fd, net_key,
+		dev->config.type, data, read_size);
 }
 
 int
