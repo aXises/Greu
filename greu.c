@@ -399,75 +399,69 @@ socket_msg_received(int fd, short event, void *conn)
 	// printf("socket message event\n");
 }
 
-/*
-* Device ready, read the packets from interface. Encapsulate it and write it
-* to our remote fd.
-*/
 void
-interface_msg_received(int fd, short event, void *conn)
+write_to_server_socket(struct gre_header header, int fd, uint32_t key,
+	enum device_type type, char *data, ssize_t read_size)
 {
-		struct device *dev = (struct device *)conn;
-		struct gre_header header;
-		ssize_t read_size;
-		char *data, *packet;
-		uint32_t *tun_af, net_key;
-		int read_offset = 0;
+	int packet_size;
+	char *packet;
 
-		header.gre_flags = 0x0000;
-		printf("device ready: %i with key %s\n", fd, dev->config.key);
+	/*
+	* Append header.
+	*/
+	packet = malloc(sizeof(struct gre_header));
+	memcpy(packet, &header, sizeof(struct gre_header));
 
-		data = malloc(BUFFER_SIZE);
-		read_size = read(fd, data, BUFFER_SIZE);
-
-		if (read_size < 0)
+	packet_size = 0;
+	if (key != -1)
+	{
+		packet = realloc(packet, sizeof(struct gre_header)
+			+ sizeof(uint32_t) + read_size);
+		memcpy(&packet[sizeof(struct gre_header)],
+			&key, sizeof(uint32_t));
+		packet_size += sizeof(struct gre_header)
+					+ sizeof(uint32_t) + read_size;
+		if (type == TYPE_TAP)
 		{
-			err(1, "Error reading from socket: %s\n", strerror(errno));
-		}
-
-		printf("-------------------- Interface Output:\n");
-		for (int i = 0; i < read_size; i++)
-		{
-			printf("%x|", data[i]);
-		}
-		printf("\n");
-
-		if (dev->config.type == TYPE_TAP)
-		{
-			header.gre_proto = PACKET_ETHERNET;
-		}
-		if (dev->config.type == TYPE_TUN)
-		{
-			tun_af = malloc(sizeof(uint32_t));
-			memcpy(tun_af, data, sizeof(uint32_t));
-			read_offset += sizeof(uint32_t);
-			if (ntohl(*tun_af) == AF_INET)
-			{
-				header.gre_proto = PACKET_IPV4;
-			}
-			else if (ntohl(*tun_af) == AF_INET6)
-			{
-				header.gre_proto = PACKET_IPV6;
-			}
-			else
-			{
-				err(1, "Unsupported socket.\n");
-			}
-		}
-
-		/*
-		* GRE key present.
-		*/
-		if (dev->config.key != NULL) {
-			header.gre_flags = header.gre_flags | GRE_KP;
-			net_key = htons(strtoul(dev->config.key, NULL, 32));
-			packet = malloc(sizeof(struct gre_header) + sizeof(uint32_t)
-				+ (sizeof(char) * (read_size - read_offset)));
+			memcpy(&packet[sizeof(struct gre_header)
+				+ sizeof(uint32_t)], &data, read_size);
 		}
 		else
 		{
-			packet = malloc(sizeof(struct gre_header) +
-				(sizeof(char) * (read_size - read_offset)));
+			memcpy(&packet[sizeof(struct gre_header)
+				+ sizeof(uint32_t)], &data[sizeof(uint32_t)],
+				read_size - sizeof(uint32_t));
+			packet_size -= sizeof(uint32_t);
 		}
+	}
+	else
+	{ 
+		packet = realloc(packet, sizeof(struct gre_header) + read_size);
+		packet_size += sizeof(struct gre_header) + read_size;
+		if (type == TYPE_TAP)
+		{
+			memcpy(&packet[sizeof(struct gre_header)],
+				&data, read_size);
+		}
+		else
+		{
+			memcpy(&packet[sizeof(struct gre_header)],
+				&data[sizeof(uint32_t)],
+				read_size - sizeof(uint32_t));
+			packet_size -= sizeof(uint32_t);
+		}
+	}
+
+	// printf("-------------------- GRE Packet\n");
+	// for (int i = 0; i < packet_size; i++)
+	// {
+	// 	printf("%x|", packet[i]);
+	// }
+	// printf("\n");
+
+	write(fd, packet, packet_size);
+	free(packet);
+}
 
 /*
 * Device ready, read the packets from interface. Encapsulate it and write it
