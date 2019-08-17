@@ -70,6 +70,23 @@ struct device
 };
 TAILQ_HEAD(device_list, device);
 
+__dead static void  usage(void);
+char              **split(char *, char *, int *);
+struct device      *setup_device(char *, enum device_type);
+struct prog_options parse_args(struct device_list *, int, char **);
+void                free_devices(struct device *, struct device_list);
+int                 make_device_fd(struct device *);
+struct addrinfo    *generate_addrinfo(const char *, const char *, sa_family_t);
+int                 create_socket_fd(sa_family_t, char *, char *, char *,
+			char *);
+void                write_to_interface(struct gre_header, struct device *,
+			enum device_type, uint32_t, char *, ssize_t);
+void                socket_msg_received(int, short, void *);
+void                write_to_server_socket(struct gre_header, int, uint32_t,
+		    	enum device_type, char *, ssize_t);
+void                interface_msg_received(int, short, void *);
+
+
 __dead static void
 usage(void)
 {
@@ -77,7 +94,7 @@ usage(void)
 	fprintf(stderr, "usage: %s [-46d] [-l address] [-p port]\n"
 			"[-e /dev/tapX[@key]] [-i /dev/tunX[@key]]\n"
 			"server [port]\n",
-			__progname);
+		__progname);
 	exit(EXIT_ERROR);
 }
 
@@ -359,17 +376,7 @@ socket_msg_received(int fd, short event, void *conn)
 			strerror(errno));
 	}
 
-	// printf("-------------------- Socket Output:\n");
-	// for (int i = 0; i < read_size; i++)
-	// {
-	// 	printf("%x|", packet[i]);
-	// }
-	// printf("\n");
-
 	memcpy(&header, packet, sizeof(struct gre_header));
-
-	// printf("flags %x\n", ntohs(header.gre_flags));
-	// printf("proto %x\n", ntohs(header.gre_proto));
 
 	if (header.gre_flags == GRE_KP)
 	{
@@ -445,13 +452,6 @@ write_to_server_socket(struct gre_header header, int fd, uint32_t key,
 		}
 	}
 
-	// printf("-------------------- GRE Packet\n");
-	// for (int i = 0; i < packet_size; i++)
-	// {
-	// 	printf("%x|", packet[i]);
-	// }
-	// printf("\n");
-
 	write(fd, packet, packet_size);
 	free(packet);
 }
@@ -470,7 +470,6 @@ interface_msg_received(int fd, short event, void *conn)
 	char data[BUFFER_SIZE];
 
 	header.gre_flags = 0x0000;
-	// printf("device ready: %i with key %s\n", fd, dev->config.key);
 
 	read_size = read(fd, data, BUFFER_SIZE);
 
@@ -479,13 +478,6 @@ interface_msg_received(int fd, short event, void *conn)
 		err(1, "Error reading from socket: %s\n", strerror(errno));
 	}
 
-	// printf("-------------------- Interface Output:\n");
-	// for (int i = 0; i < read_size; i++)
-	// {
-	// 	// printf("|"BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(data[i]));
-	// 	printf("%x|", data[i]);
-	// }
-	// printf("\n");
 
 	if (dev->config.type == TYPE_TAP)
 	{
