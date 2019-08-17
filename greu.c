@@ -469,17 +469,48 @@ interface_msg_received(int fd, short event, void *conn)
 				(sizeof(char) * (read_size - read_offset)));
 		}
 
-		/*
-		* Append header.
-		*/
-		memcpy(packet, &header, sizeof(struct gre_header));
+/*
+* Device ready, read the packets from interface. Encapsulate it and write it
+* to our remote fd.
+*/
+void
+interface_msg_received(int fd, short event, void *conn)
+{
+	struct device *dev = (struct device *)conn;
+	struct gre_header header;
+	uint32_t *tun_af, net_key;
+	ssize_t read_size;
+	char data[BUFFER_SIZE];
 
-		/*
-		* Append data and/or key.
-		*/
-		if (dev->config.key != NULL) {
-			memcpy(&packet[sizeof(struct gre_header)], &net_key, sizeof(uint32_t));
-			memcpy(&packet[sizeof(struct gre_header) + sizeof(uint32_t)], &data[read_offset], read_size - read_offset);
+	header.gre_flags = 0x0000;
+	// printf("device ready: %i with key %s\n", fd, dev->config.key);
+
+	read_size = read(fd, data, BUFFER_SIZE);
+
+	if (read_size < 0)
+	{
+		err(1, "Error reading from socket: %s\n", strerror(errno));
+	}
+
+	// printf("-------------------- Interface Output:\n");
+	// for (int i = 0; i < read_size; i++)
+	// {
+	// 	// printf("|"BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(data[i]));
+	// 	printf("%x|", data[i]);
+	// }
+	// printf("\n");
+
+	if (dev->config.type == TYPE_TAP)
+	{
+		header.gre_proto = PACKET_ETHERNET;
+	}
+	if (dev->config.type == TYPE_TUN)
+	{
+		tun_af = malloc(sizeof(uint32_t));
+		memcpy(tun_af, data, sizeof(uint32_t));
+		if (ntohl(*tun_af) == AF_INET)
+		{
+			header.gre_proto = PACKET_IPV4;
 		}
 		else {
 			memcpy(&packet[sizeof(struct gre_header)], &data[read_offset], read_size - read_offset);
