@@ -533,40 +533,41 @@ interface_msg_received(int fd, short event, void *conn)
 int
 main(int argc, char *argv[])
 {
-		struct device_list devices = TAILQ_HEAD_INITIALIZER(devices);
-		struct prog_options options;
-		struct device *dev;
-		struct event *socket_conn_event;
-		int sock_fd;
+	struct device_list devices = TAILQ_HEAD_INITIALIZER(devices);
+	struct event *socket_conn_event;
+	struct prog_options options;
+	struct device *dev;
+	int sock_fd;
 
-		options = parse_args(&devices, argc, argv);
-		printf("greu - local_address: %s, source_port %s, server: %s, destination_port: %s\n", options.local_address, options.source_port, options.server, options.destin_port);
+	options = parse_args(&devices, argc, argv);
 
-		sock_fd = create_socket_fd(options.af, options.local_address, options.source_port,
-			options.server, options.destin_port);
+	sock_fd = create_socket_fd(options.af, options.local_address,
+		options.source_port, options.server, options.destin_port);
 
-		printf("Socket fd: %i\n", sock_fd);
+	if (!options.no_daemon)
+	{
+		daemon(0, 0);
+	}
 
-		event_init();
+	event_init();
 
-		socket_conn_event = malloc(sizeof(struct event));
-		event_set(socket_conn_event, sock_fd, EV_READ | EV_PERSIST,
-				socket_msg_received, socket_conn_event);
-		event_add(socket_conn_event, NULL);
+	TAILQ_FOREACH(dev, &devices, entry)
+	{
+		dev->options = options;
+		dev->socket_fd = sock_fd;
+		dev->device_fd = make_device_fd(dev);
+		event_set(&dev->ev, dev->device_fd, EV_READ | EV_PERSIST,
+				interface_msg_received, dev);
+		event_add(&dev->ev, NULL);
+	}
 
-		TAILQ_FOREACH(dev, &devices, entry)
-		{
-			dev->options = options;
-			dev->socket_fd = sock_fd;
-			int device_fd = make_device_fd(dev);
-			printf("Interface %s created on fd: %i\n", dev->config.dev_path, device_fd);
-			event_set(&dev->ev, device_fd, EV_READ | EV_PERSIST,
-					interface_msg_received, dev);
-			event_add(&dev->ev, NULL);
-		}
+	socket_conn_event = malloc(sizeof(struct event));
+	event_set(socket_conn_event, sock_fd, EV_READ | EV_PERSIST,
+			socket_msg_received, &devices);
+	event_add(socket_conn_event, NULL);
 
-		event_dispatch();
+	event_dispatch();
 
-		free_devices(dev, devices);
-		return EXIT_NORMAL;
+	free_devices(dev, devices);
+	return EXIT_NORMAL;
 }
