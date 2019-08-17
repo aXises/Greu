@@ -74,7 +74,7 @@ __dead static void  usage(void);
 char              **split(char *, char *, int *);
 struct device      *setup_device(char *, enum device_type);
 struct prog_options parse_args(struct device_list *, int, char **);
-void                free_devices(struct device *, struct device_list);
+void                free_devices(struct device_list);
 int                 make_device_fd(struct device *);
 struct addrinfo    *generate_addrinfo(const char *, const char *, sa_family_t);
 int                 create_socket_fd(sa_family_t, char *, char *, char *,
@@ -554,6 +554,6 @@ main(int argc, char *argv[])
 
 	event_dispatch();
 
-	free_devices(dev, devices);
+	free_devices(devices);
 	return EXIT_NORMAL;
 }
