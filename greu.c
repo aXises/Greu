@@ -102,7 +102,8 @@ usage(void)
 * Split an string in to an array of strings by an character.
 * @param string - The string to split.
 * @param delim - The character to split by.
-* @return char - An array of split strings.
+* @param size - Size of the split array.
+* @return An array of split strings.
 */
 char **
 split(char *string, char *delim, int *size)
@@ -124,6 +125,12 @@ split(char *string, char *delim, int *size)
 	return split_string;
 }
 
+/**
+* Sets up a interface device.
+* @param dev_str - Name of the device to open.
+* @param type - The type of the device. TAP/TUN.
+* @return Pointer to a setup device.
+*/
 struct device *
 setup_device(char *dev_str, enum device_type type)
 {
@@ -154,6 +161,13 @@ setup_device(char *dev_str, enum device_type type)
 	return dev;
 }
 
+/**
+* Parses program arguments.
+* @param devices - Tail queue to store devices.
+* @param argc - Argument count.
+* @param argv - Argument vector.
+* @return Struct of program arguments based on command line args.
+*/
 struct prog_options
 parse_args(struct device_list *devices, int argc, char *argv[])
 {
@@ -221,9 +235,14 @@ parse_args(struct device_list *devices, int argc, char *argv[])
 	return options;
 }
 
+/**
+* Frees devices at the end of the program.
+* @param devices - List of setup devices.
+*/
 void
-free_devices(struct device *dev, struct device_list devices)
+free_devices(struct device_list devices)
 {
+	struct device *dev;
 	TAILQ_FOREACH(dev, &devices, entry)
 	{
 		free(dev->config.dev_path);
@@ -231,6 +250,11 @@ free_devices(struct device *dev, struct device_list devices)
 	}
 }
 
+/**
+* Generates a fd from a device.
+* @param dev - Pointer to a setup device.
+* @return File descriptor of the device.
+*/
 int
 make_device_fd(struct device *dev)
 {
@@ -255,6 +279,13 @@ make_device_fd(struct device *dev)
 	return fd;
 }
 
+/**
+* Generates a addrinfo struct from given parameters.
+* @param name - Name of the address.
+* @param port - Port of the address.
+* @param af - Socket type.
+* @return pointer to a addrinfo struct.
+*/
 struct addrinfo *
 generate_addrinfo(const char *name, const char *port, sa_family_t af)
 {
@@ -275,6 +306,15 @@ generate_addrinfo(const char *name, const char *port, sa_family_t af)
 		return res;
 }
 
+/**
+* Creates a fd which is binded and connected by greu.
+* @param af - Socket type.
+* @param hostname - Address of the local host.
+* @param port - Port of the local host.
+* @param remote_name - Address of the remote connection.
+* @param remote_port - Port of the remote host.
+* @return File descriptor which is binded and connected to the params.
+*/
 int
 create_socket_fd(sa_family_t af, char *hostname, char *port,
 	char *remote_name, char *remote_port)
@@ -325,6 +365,16 @@ create_socket_fd(sa_family_t af, char *hostname, char *port,
 	return sock_fd;
 }
 
+/**
+* Writes to a device interface.
+* @param header - GRE header.
+* @param dev - Pointer to the device struct.
+* @param type - The type of the interface.
+* @param key - Key associated with the device.
+* @param packet - The packet to write from.
+* @param read_size - Amount of bytes to write.
+* @return File descriptor which is binded and connected to the params.
+*/
 void
 write_to_interface(struct gre_header header, struct device *dev,
 	enum device_type type, uint32_t key, char *packet, ssize_t read_size)
@@ -356,6 +406,7 @@ write_to_interface(struct gre_header header, struct device *dev,
 
 /*
 * Data received from remote fd, decapsulate it and write to our interface.
+* Event callback method.
 */
 void
 socket_msg_received(int fd, short event, void *conn)
@@ -399,6 +450,15 @@ socket_msg_received(int fd, short event, void *conn)
 	}
 }
 
+/**
+* Writes to a device interface.
+* @param header - GRE header.
+* @param fd - File descriptor to write to.
+* @param key - Key associated with the device.
+* @param type - The type of the interface.
+* @param data - The data to write from.
+* @param read_size - Amount of bytes to write.
+*/
 void
 write_to_server_socket(struct gre_header header, int fd, uint32_t key,
 	enum device_type type, char *data, ssize_t read_size)
@@ -458,7 +518,7 @@ write_to_server_socket(struct gre_header header, int fd, uint32_t key,
 
 /*
 * Device ready, read the packets from interface. Encapsulate it and write it
-* to our remote fd.
+* to our remote fd. Event callback method.
 */
 void
 interface_msg_received(int fd, short event, void *conn)
