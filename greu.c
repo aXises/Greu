@@ -423,8 +423,8 @@ socket_msg_received(int fd, short event, void *conn)
 
 	if (read_size < 0)
 	{
-		err(1, "Error reading from %s: %s\n", dev->config.dev_path,
-			strerror(errno));
+		err(1, "Error reading socket %i: %s\n", fd, strerror(errno));
+		return;
 	}
 
 	memcpy(&header, packet, sizeof(struct gre_header));
@@ -445,8 +445,7 @@ socket_msg_received(int fd, short event, void *conn)
 
 	TAILQ_FOREACH(dev, devices, entry)
 	{
-		write_to_interface(header, dev, packet_type, key, packet,
-			read_size);
+		write_to_interface(header, dev, packet_type, key, packet, read_size);
 	}
 }
 
@@ -535,9 +534,9 @@ interface_msg_received(int fd, short event, void *conn)
 
 	if (read_size < 0)
 	{
-		err(1, "Error reading from socket: %s\n", strerror(errno));
+		err(1, "Error reading from interface %s: %s\n", dev->config.dev_path,
+			strerror(errno));
 	}
-
 
 	if (dev->config.type == TYPE_TAP)
 	{
